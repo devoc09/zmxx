@@ -162,9 +162,26 @@ func (r *Repo) EnsureWorktree(branch, path, baseRef string) error {
 	if err != nil {
 		return err
 	}
+	registered := false
+	stale := false
 	for _, wt := range existing {
-		if filepath.Clean(wt.Path) == filepath.Clean(path) {
-			return nil // already registered
+		if SamePath(wt.Path, path) {
+			registered = true
+			if _, statErr := os.Stat(path); os.IsNotExist(statErr) {
+				// Registered in git but the directory is gone (e.g. deleted
+				// by hand). Drop the stale entry so the branch can be
+				// checked out again below.
+				stale = true
+			}
+			break
+		}
+	}
+	if registered && !stale {
+		return nil // already registered
+	}
+	if stale {
+		if err := r.Prune(); err != nil {
+			return fmt.Errorf("git worktree prune failed: %w", err)
 		}
 	}
 
@@ -253,6 +270,35 @@ func (r *Repo) RemoveWorktree(worktreePath string, force bool) error {
 func (r *Repo) Prune() error {
 	cmd := gitCmd(r.Root, "worktree", "prune")
 	return cmd.Run()
+}
+
+// SamePath reports whether two paths refer to the same location. git
+// reports fully resolved paths, so e.g. /var/... vs /private/var/... on
+// macOS must compare equal even though the strings differ.
+func SamePath(a, b string) bool {
+	return CanonicalPath(a) == CanonicalPath(b)
+}
+
+// CanonicalPath resolves symlinks on the longest existing prefix of the
+// path, falling back to the absolute path when nothing can be resolved.
+func CanonicalPath(p string) string {
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		abs = filepath.Clean(p)
+	}
+	cur := abs
+	var tail []string
+	for {
+		if resolved, err := filepath.EvalSymlinks(cur); err == nil {
+			return filepath.Join(append([]string{resolved}, tail...)...)
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return abs
+		}
+		tail = append([]string{filepath.Base(cur)}, tail...)
+		cur = parent
+	}
 }
 
 func gitCmd(dir string, args ...string) *exec.Cmd {

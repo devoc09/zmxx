@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/devoc09/zmxx/internal/gitx"
 )
 
 const (
@@ -50,10 +52,11 @@ func SessionName(repoID, branch string) string {
 }
 
 // IsManagedPath reports whether p lives under the zmxx worktrees dir.
+// Both sides are canonicalized because git reports resolved paths
+// (e.g. /private/var/... on macOS).
 func IsManagedPath(p string) bool {
-	clean := filepath.Clean(p)
-	base := filepath.Clean(WorktreesDir()) + string(filepath.Separator)
-	return strings.HasPrefix(clean, base)
+	base := gitx.CanonicalPath(WorktreesDir()) + string(filepath.Separator)
+	return strings.HasPrefix(gitx.CanonicalPath(p), base)
 }
 
 // BuildLabels returns the labels applied to a zmx session so the picker can

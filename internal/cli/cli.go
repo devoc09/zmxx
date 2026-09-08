@@ -185,17 +185,23 @@ func cmdList(args []string, stdout, stderr io.Writer) int {
 		clients  string
 		current  bool
 		worktree string
+		missing  bool
 	}
 	var rows []row
+	missingAny := false
 	for _, wt := range worktrees {
 		if !workspace.IsManagedPath(wt.Path) || wt.Branch == "" || wt.Detached {
 			continue
 		}
+		_, statErr := os.Stat(wt.Path)
+		missing := statErr != nil && os.IsNotExist(statErr)
+		missingAny = missingAny || missing
 		sessionName := workspace.SessionName(repo.ID, wt.Branch)
 		r := row{
 			branch:   wt.Branch,
 			session:  sessionName,
 			clients:  "-",
+			missing:  missing,
 			worktree: shortenHome(wt.Path),
 		}
 		if s, ok := byName[sessionName]; ok {
@@ -216,7 +222,14 @@ func cmdList(args []string, stdout, stderr io.Writer) int {
 		if r.current {
 			mark = "\u2192"
 		}
-		fmt.Fprintf(stdout, "%s%-29s %-38s %-8s %s\n", mark, truncate(r.branch, 29), truncate(r.session, 38), r.clients, r.worktree)
+		worktree := r.worktree
+		if r.missing {
+			worktree += " (missing)"
+		}
+		fmt.Fprintf(stdout, "%s%-29s %-38s %-8s %s\n", mark, truncate(r.branch, 29), truncate(r.session, 38), r.clients, worktree)
+	}
+	if missingAny {
+		fmt.Fprintln(stdout, "\nsome worktrees are missing on disk; clean them up with `zmxx remove <branch> --force`")
 	}
 	return 0
 }
@@ -259,14 +272,19 @@ func cmdRemove(args []string, stdout, stderr io.Writer) int {
 	sessionName := workspace.SessionName(repo.ID, branch)
 
 	registered := false
+	missing := false
 	worktrees, err := repo.ListWorktrees()
 	if err != nil {
 		fmt.Fprintf(stderr, "zmxx: %v\n", err)
 		return 1
 	}
 	for _, wt := range worktrees {
-		if filepath.Clean(wt.Path) == filepath.Clean(worktreePath) {
+		if gitx.SamePath(wt.Path, worktreePath) {
 			registered = true
+			if _, statErr := os.Stat(worktreePath); os.IsNotExist(statErr) {
+				// Registered in git but the directory is already gone.
+				missing = true
+			}
 			break
 		}
 	}
@@ -279,7 +297,7 @@ func cmdRemove(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	if !force {
+	if !missing && !force {
 		dirty, err := repo.IsDirty(worktreePath)
 		if err != nil {
 			fmt.Fprintf(stderr, "zmxx: %v\n", err)
@@ -305,6 +323,17 @@ func cmdRemove(args []string, stdout, stderr io.Writer) int {
 	if err := zmx.Kill(sessionName); err != nil {
 		fmt.Fprintf(stderr, "zmxx: %v\n", err)
 		return 1
+	}
+	if missing {
+		// The directory is already gone, so there is nothing to check out;
+		// drop the stale registration instead of `git worktree remove`
+		// (which fails with "is not a working tree").
+		if err := repo.Prune(); err != nil {
+			fmt.Fprintf(stderr, "zmxx: git worktree prune failed: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "removed session %s and stale worktree entry %s\n", sessionName, worktreePath)
+		return 0
 	}
 	if err := repo.RemoveWorktree(worktreePath, force); err != nil {
 		fmt.Fprintf(stderr, "zmxx: %v\n", err)
