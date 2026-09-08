@@ -78,6 +78,7 @@ Neovim 内では:
 - セッション名は非表示で、リポジトリ名・ブランチ・worktree パス・接続数で絞り込み
 - 選択中のセッションのスクロールバックを `zmx history` でプレビュー（`follow` で下端追従）
 - `Enter` で端末の zmx クライアントを選択したセッションへ切り替え（neovim 自体は元のセッションで動作継続）
+- 通常起動した Neovim（zmx セッション外）では、新しいターミナルタブを開いて選択したセッションへアタッチ。zmx の `Ctrl+\` でデタッチするとタブを閉じ、元の Neovim に戻る
 
 ## 仕組み
 
@@ -87,6 +88,7 @@ Neovim 内では:
 - セッションのコマンドは `bash -c 'nvim .; exec "${SHELL:-/bin/sh}"'`。neovim 終了後はシェルに引き継がれるため、ワークスペースは `zmxx remove` まで生存する
 - セッションには `zmxx=1` / `zmxx.repo` / `zmxx.reponame` / `zmxx.branch` / `zmxx.worktree` のラベルを付与（値は base64url）。ピッカーはこのラベルで全 zmxx セッションを検出
 - 切り替えは zmx のネイティブな Switch IPC を利用: neovim から `zmxx switch <name>` → `zmx attach <name>` を実行すると、`ZMX_SESSION` を手がかりに zmx が**端末のクライアントだけ**を移動させます
+- `ZMX_SESSION` が未設定の場合は、Neovim のターミナルタブで `zmxx switch <name>` を実行し、対話操作用の PTY を持つクライアントとして接続します
 - `zmxx switch` は存在するセッションのみ受け付け（upsert による誤生成を防止）
 
 ## 制約・メモ
