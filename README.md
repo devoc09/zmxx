@@ -53,6 +53,19 @@ zmxx remove feature/foo
 zmxx remove feature/foo --force
 ```
 
+### セッションの寿命
+
+ワークスペースの zmx セッションは**シェルベース**です。`zmxx new` はセッション内で `nvim .` を起動しますが、neovim を `:q` で閉じてもセッションは消えず、ワークスペース内のシェルプロンプトに戻ります。
+
+```sh
+# セッション内のシェルから neovim を再起動
+nvim .
+```
+
+そのため、別のターミナルから `zmxx switch`（またはピッカー）で後からいつでもこのワークスペースに戻れます。セッションを明示的に終了するのは `zmxx remove` のみです。
+
+## 仕組み
+
 Neovim 内では:
 
 | 操作 | 説明 |
@@ -71,6 +84,7 @@ Neovim 内では:
 - worktree は `$XDG_DATA_HOME/zmxx/worktrees/<repo-id>/<branch-slug>-<hash>` に決定的なパスで配置（未設定時は `~/.local/share/zmxx`）
 - `<repo-id>` は origin URL（無ければ git common dir）の SHA-256 先頭 12 桁
 - zmx セッション名は unix socket の長さ制限に収まる `zmxx-<repo-id>-<branch-hash>`（各 12 桁）
+- セッションのコマンドは `bash -c 'nvim .; exec "${SHELL:-/bin/sh}"'`。neovim 終了後はシェルに引き継がれるため、ワークスペースは `zmxx remove` まで生存する
 - セッションには `zmxx=1` / `zmxx.repo` / `zmxx.reponame` / `zmxx.branch` / `zmxx.worktree` のラベルを付与（値は base64url）。ピッカーはこのラベルで全 zmxx セッションを検出
 - 切り替えは zmx のネイティブな Switch IPC を利用: neovim から `zmxx switch <name>` → `zmx attach <name>` を実行すると、`ZMX_SESSION` を手がかりに zmx が**端末のクライアントだけ**を移動させます
 - `zmxx switch` は存在するセッションのみ受け付け（upsert による誤生成を防止）

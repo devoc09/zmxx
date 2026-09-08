@@ -16,10 +16,12 @@ import (
 	"github.com/devoc09/zmxx/internal/zmx"
 )
 
-const (
-	// NvimCommand is the command zmxx launches inside a workspace session.
-	NvimCommand = "nvim"
-)
+// workspaceCmd builds the session command. nvim runs first; when it exits
+// the session hands over to the user's shell so the workspace survives
+// (a session whose command exits would otherwise be torn down by zmx).
+func workspaceCmd() []string {
+	return []string{"bash", "-c", `nvim .; exec "${SHELL:-/bin/sh}"`}
+}
 
 // Run dispatches a zmxx invocation. It returns the process exit code.
 func Run(args []string, stdout, stderr io.Writer) int {
@@ -129,7 +131,7 @@ func cmdNew(args []string, stdout, stderr io.Writer) int {
 
 	// 1. Make sure the session exists (nvim running, labels applied) without
 	//    stealing the calling terminal.
-	if err := zmx.EnsureSession(sessionName, labelStr, worktreePath, []string{NvimCommand, "."}); err != nil {
+	if err := zmx.EnsureSession(sessionName, labelStr, worktreePath, workspaceCmd()); err != nil {
 		fmt.Fprintf(stderr, "zmxx: %v\n", err)
 		return 1
 	}
@@ -407,7 +409,7 @@ func cmdSwitch(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if !zmx.SessionExists(name) {
-		fmt.Fprintf(stderr, "zmxx: session %q does not exist; only existing zmxx sessions can be switched to\n", name)
+		fmt.Fprintf(stderr, "zmxx: session %q does not exist (it may have ended); reopen its workspace with `zmxx new <branch>`\n", name)
 		return 1
 	}
 	if err := zmx.Attach(name); err != nil {
