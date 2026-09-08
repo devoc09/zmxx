@@ -1,0 +1,7 @@
+# build artifacts
+/zmxx
+/dist/
+
+# editor / os noise
+.DS_Store
+*.swp
