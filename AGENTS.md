@@ -8,6 +8,8 @@ A file for [guiding coding agents](https://agents.md/).
 - **Test (Go):** `go test ./...`
 - **Test filter (Go):** `go test ./internal/<pkg> -run <test name>`
 - **Vet:** `go vet ./...`
+- **Lint:** `golangci-lint run` (config: `.golangci.yml`; includes `gofmt`
+  check — format with `gofmt -w .`)
 - **Test (picker):** `nvim --headless -u NONE -l tests/picker.lua`
   - Requires the `zmx` binary. Runs real zmx sessions in a private socket
     directory (`ZMX_DIR`), stubs fzf-lua, and drives the picker callbacks
