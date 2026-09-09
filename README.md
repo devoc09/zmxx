@@ -1,30 +1,30 @@
 # zmxx
 
-`zmxx` は [git worktree](https://git-scm.com/docs/git-worktree) と
-[zmx](https://zmx.sh) を組み合わせたワークスペースツールです。
+`zmxx` is a workspace tool that combines [git worktree](https://git-scm.com/docs/git-worktree)
+with [zmx](https://zmx.sh).
 
-1. ターミナルで作業対象の Git リポジトリに移動する
-2. `zmxx new <branch>` で worktree を作成し、zmx セッション内で neovim を起動する
-3. neovim から `Zl` で zmx セッションのピッカーを開き、別のワークスペースへ切り替える
+1. Navigate to the Git repository you want to work on in your terminal.
+2. Run `zmxx new <branch>` to create a worktree and launch Neovim in a zmx session.
+3. Press `Zl` in Neovim to open the zmx session picker and switch to another workspace.
 
-## 要件
+## Requirements
 
-- Go 1.24 以上（ビルド時）
-- [zmx](https://zmx.sh) 0.8.0 以上（ラベルとセッション切替に必要）
-- Neovim 0.10 以上（`vim.system` を使用）
-- [fzf-lua](https://github.com/ibhagwan/fzf-lua)（ピッカー UI）
+- Go 1.24 or later (for building)
+- [zmx](https://zmx.sh) 0.8.0 or later (required for labels and session switching)
+- Neovim 0.10 or later (uses `vim.system`)
+- [fzf-lua](https://github.com/ibhagwan/fzf-lua) (picker UI)
 
-## インストール
+## Installation
 
 ### CLI
 
 ```sh
 go install github.com/devoc09/zmxx/cmd/zmxx@latest
-# またはローカルでビルド
+# Or build locally
 go build -o ~/.local/bin/zmxx ./cmd/zmxx
 ```
 
-### Neovim プラグイン（lazy.nvim）
+### Neovim plugin (lazy.nvim)
 
 ```lua
 {
@@ -34,66 +34,66 @@ go build -o ~/.local/bin/zmxx ./cmd/zmxx
 }
 ```
 
-## 使い方
+## Usage
 
 ```sh
-# ワークスペースを作成して neovim を起動（既存ブランチなら再利用、なければ HEAD から新規作成）
+# Create a workspace and launch Neovim (reuse an existing branch, or create one from HEAD)
 zmxx new feature/foo
 
-# 別の基点からブランチを作る
+# Create a branch from a different starting point
 zmxx new feature/bar --base main
 
-# このリポジトリの管理済みワークスペース一覧
+# List managed workspaces for this repository
 zmxx list
 
-# セッションを kill して worktree を削除（ブランチは残る）
+# Kill the session and remove the worktree (keep the branch)
 zmxx remove feature/foo
 
-# 作業中（--force で確認をスキップし、未コミット変更も破棄）
+# Remove a workspace with work in progress (--force skips confirmation and discards uncommitted changes)
 zmxx remove feature/foo --force
 ```
 
-### セッションの寿命
+### Session lifetime
 
-ワークスペースの zmx セッションは**シェルベース**です。`zmxx new` はセッション内で `nvim .` を起動しますが、neovim を `:q` で閉じてもセッションは消えず、ワークスペース内のシェルプロンプトに戻ります。
+A workspace's zmx session is **shell-based**. `zmxx new` launches `nvim .` inside the session, but closing Neovim with `:q` keeps the session alive and returns you to a shell prompt in the workspace.
 
 ```sh
-# セッション内のシェルから neovim を再起動
+# Restart Neovim from the shell inside the session
 nvim .
 ```
 
-そのため、別のターミナルから `zmxx switch`（またはピッカー）で後からいつでもこのワークスペースに戻れます。セッションを明示的に終了するのは `zmxx remove` のみです。
+You can return to this workspace at any time using `zmxx switch` from another terminal or using the picker. Only `zmxx remove` explicitly terminates the session.
 
-## 仕組み
+## Session picker
 
-Neovim 内では:
+In Neovim:
 
-| 操作 | 説明 |
+| Action | Description |
 | --- | --- |
-| `Zl` | 全 zmxx セッションのピッカーを開く |
-| `:ZmxxSessions` | ピッカーを開く（コマンド版） |
+| `Zl` | Open the picker for all zmxx sessions |
+| `:ZmxxSessions` | Open the picker using a command |
 
-ピッカーでは:
+In the picker:
 
-- セッション名は非表示で、リポジトリ名・ブランチ・worktree パス・接続数で絞り込み
-- 選択中のセッションのスクロールバックを `zmx history` でプレビュー（`follow` で下端追従）
-- `Enter` で端末の zmx クライアントを選択したセッションへ切り替え（neovim 自体は元のセッションで動作継続）
-- 通常起動した Neovim（zmx セッション外）では、新しいターミナルタブを開いて選択したセッションへアタッチ。zmx の `Ctrl+\` でデタッチするとタブを閉じ、元の Neovim に戻る
+- Filter by repository name, branch, worktree path, or connection count. Session names are hidden.
+- Preview the selected session's scrollback with `zmx history`, using `follow` to keep the preview scrolled to the bottom.
+- Press `Enter` to switch the terminal's zmx client to the selected session. Neovim itself continues running in the original session.
+- When Neovim is running outside a zmx session, the picker opens a new terminal tab and attaches to the selected session. Detach with zmx's `Ctrl+\` to close the tab and return to the original Neovim instance.
 
-## 仕組み
+## How it works
 
-- worktree は `$XDG_DATA_HOME/zmxx/worktrees/<repo-id>/<branch-slug>-<hash>` に決定的なパスで配置（未設定時は `~/.local/share/zmxx`）
-- `<repo-id>` は origin URL（無ければ git common dir）の SHA-256 先頭 12 桁
-- zmx セッション名は unix socket の長さ制限に収まる `zmxx-<repo-id>-<branch-hash>`（各 12 桁）
-- セッションのコマンドは `bash -c 'nvim .; exec "${SHELL:-/bin/sh}"'`。neovim 終了後はシェルに引き継がれるため、ワークスペースは `zmxx remove` まで生存する
-- セッションには `zmxx=1` / `zmxx.repo` / `zmxx.reponame` / `zmxx.branch` / `zmxx.worktree` のラベルを付与（値は base64url）。ピッカーはこのラベルで全 zmxx セッションを検出
-- 切り替えは zmx のネイティブな Switch IPC を利用: neovim から `zmxx switch <name>` → `zmx attach <name>` を実行すると、`ZMX_SESSION` を手がかりに zmx が**端末のクライアントだけ**を移動させます
-- `ZMX_SESSION` が未設定の場合は、Neovim のターミナルタブで `zmxx switch <name>` を実行し、対話操作用の PTY を持つクライアントとして接続します
-- `zmxx switch` は存在するセッションのみ受け付け（upsert による誤生成を防止）
+- Worktrees are placed at deterministic paths under `$XDG_DATA_HOME/zmxx/worktrees/<repo-id>/<branch-slug>-<hash>`. If `XDG_DATA_HOME` is unset, the base directory defaults to `~/.local/share/zmxx`.
+- `<repo-id>` is the first 12 hexadecimal characters of the SHA-256 hash of the origin URL, or the Git common directory if no origin URL is available.
+- zmx sessions are named `zmxx-<repo-id>-<branch-hash>`, with 12 characters for each hash, to fit within Unix socket path length limits.
+- The session command is `bash -c 'nvim .; exec "${SHELL:-/bin/sh}"'`. After Neovim exits, the shell takes over, keeping the workspace alive until `zmxx remove`.
+- Sessions are tagged with `zmxx=1` / `zmxx.repo` / `zmxx.reponame` / `zmxx.branch` / `zmxx.worktree` labels (metadata values use base64url encoding). The picker uses these labels to discover all zmxx sessions.
+- Switching uses zmx's native Switch IPC: running `zmxx switch <name>` → `zmx attach <name>` from Neovim lets zmx use `ZMX_SESSION` to move **only the terminal's client** to the target session.
+- If `ZMX_SESSION` is unset, `zmxx switch <name>` runs in a Neovim terminal tab, connecting as a client with a PTY for interactive use.
+- `zmxx switch` only accepts existing sessions, preventing accidental session creation through upsert behavior.
 
-## 制約・メモ
+## Limitations and notes
 
-- `ZMX_SESSION_PREFIX` は zmxx が管理するセッションでは使わないでください（zmxx は全 zmx 呼び出しで prefix を空にします）
-- `zmxx remove` は最初に zmx セッションを kill します。自分がアタッチ中のセッションを削除すると端末の接続が切れます
-- セッションはリポジトリをまたいで 1 つの名前空間で管理されます（ピッカーは全 zmxx セッションを表示）
-- ワークスペース内で neovim 以外のコマンドを起動したい場合は `zmx attach <session-name> <command>` を直接利用できます（`zmxx list` でセッション名を確認）
+- Do not use `ZMX_SESSION_PREFIX` for sessions managed by zmxx. zmxx clears the prefix for every zmx call.
+- `zmxx remove` kills the zmx session first. Removing the session you are currently attached to disconnects your terminal.
+- Sessions share a single namespace across repositories. The picker displays all zmxx sessions.
+- To run a command other than Neovim in a workspace, use `zmx attach <session-name> <command>` directly. Run `zmxx list` to find the session name.
