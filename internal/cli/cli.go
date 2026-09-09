@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/devoc09/zmxx/internal/gitx"
@@ -38,8 +36,6 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	case "new":
 		return cmdNew(args[1:], stdout, stderr)
-	case "list":
-		return cmdList(args[1:], stdout, stderr)
 	case "remove":
 		return cmdRemove(args[1:], stdout, stderr)
 	case "sessions":
@@ -63,9 +59,8 @@ func printUsage(w io.Writer) {
 Usage:
   zmxx new <branch> [--base <ref>]   Create (or reuse) a worktree for a branch
                                      and open a persistent nvim session
-  zmxx list                          Show managed worktrees of this repository
-  zmxx remove <branch> [--force]     Kill the session and remove the worktree
   zmxx sessions [--json]             List all zmxx sessions
+  zmxx remove <session> [--force]    Kill the session and remove its worktree
   zmxx preview <session>             Print scrollback tail (picker preview)
   zmxx switch <session>              Switch the terminal to another session
 
@@ -152,90 +147,38 @@ func cmdNew(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func cmdList(args []string, stdout, stderr io.Writer) int {
-	for _, a := range args {
-		if strings.HasPrefix(a, "-") {
-			fmt.Fprintf(stderr, "zmxx: unknown flag %q\n", a)
-			return 1
-		}
-	}
-	repo, err := requireRepo()
-	if err != nil {
-		fmt.Fprintf(stderr, "zmxx: %v\n", err)
-		return 1
-	}
+// isRegisteredWorktree reports whether path is one of repo's worktrees.
+func isRegisteredWorktree(repo *gitx.Repo, path string) (bool, error) {
 	worktrees, err := repo.ListWorktrees()
 	if err != nil {
-		fmt.Fprintf(stderr, "zmxx: %v\n", err)
-		return 1
+		return false, err
 	}
-	sessions, err := zmx.List()
-	if err != nil {
-		fmt.Fprintf(stderr, "zmxx: %v\n", err)
-		return 1
-	}
-	byName := map[string]zmx.Session{}
-	for _, s := range sessions {
-		byName[s.Name] = s
-	}
-
-	type row struct {
-		branch   string
-		session  string
-		clients  string
-		current  bool
-		worktree string
-		missing  bool
-	}
-	var rows []row
-	missingAny := false
 	for _, wt := range worktrees {
-		if !workspace.IsManagedPath(wt.Path) || wt.Branch == "" || wt.Detached {
-			continue
+		if gitx.SamePath(wt.Path, path) {
+			return true, nil
 		}
-		_, statErr := os.Stat(wt.Path)
-		missing := statErr != nil && os.IsNotExist(statErr)
-		missingAny = missingAny || missing
-		sessionName := workspace.SessionName(repo.ID, wt.Branch)
-		r := row{
-			branch:   wt.Branch,
-			session:  sessionName,
-			clients:  "-",
-			missing:  missing,
-			worktree: shortenHome(wt.Path),
-		}
-		if s, ok := byName[sessionName]; ok {
-			r.clients = s.Clients
-			r.current = s.Current
-		}
-		rows = append(rows, r)
 	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].branch < rows[j].branch })
+	return false, nil
+}
 
-	if len(rows) == 0 {
-		fmt.Fprintln(stdout, "no zmxx worktrees in this repository (run `zmxx new <branch>`)")
-		return 0
+// removeRepo resolves the repository a session's worktree belongs to. The
+// worktree itself identifies it when it exists on disk; for a directory
+// that is already gone, the current repository is used when the stale entry
+// is registered there.
+func removeRepo(worktreePath string) (*gitx.Repo, error) {
+	if repo, err := gitx.FindRepo(worktreePath); err == nil {
+		return repo, nil
 	}
-	fmt.Fprintf(stdout, "%-30s %-38s %-8s %s\n", "BRANCH", "SESSION", "CLIENTS", "WORKTREE")
-	for _, r := range rows {
-		mark := " "
-		if r.current {
-			mark = "\u2192"
+	if repo, err := requireRepo(); err == nil {
+		if registered, regErr := isRegisteredWorktree(repo, worktreePath); regErr == nil && registered {
+			return repo, nil
 		}
-		worktree := r.worktree
-		if r.missing {
-			worktree += " (missing)"
-		}
-		fmt.Fprintf(stdout, "%s%-29s %-38s %-8s %s\n", mark, truncate(r.branch, 29), truncate(r.session, 38), r.clients, worktree)
 	}
-	if missingAny {
-		fmt.Fprintln(stdout, "\nsome worktrees are missing on disk; clean them up with `zmxx remove <branch> --force`")
-	}
-	return 0
+	return nil, fmt.Errorf("cannot resolve the repository of %s; run `zmxx remove` from inside it", worktreePath)
 }
 
 func cmdRemove(args []string, stdout, stderr io.Writer) int {
-	branch := ""
+	name := ""
 	force := false
 	yes := false
 	for _, a := range args {
@@ -245,56 +188,56 @@ func cmdRemove(args []string, stdout, stderr io.Writer) int {
 		case "--yes":
 			yes = true
 		case "-h", "--help":
-			fmt.Fprintln(stdout, "usage: zmxx remove <branch> [--force] [--yes]")
+			fmt.Fprintln(stdout, "usage: zmxx remove <session> [--force] [--yes]")
 			return 0
 		default:
 			if strings.HasPrefix(a, "-") {
 				fmt.Fprintf(stderr, "zmxx: unknown flag %q\n", a)
 				return 1
 			}
-			if branch != "" {
+			if name != "" {
 				fmt.Fprintf(stderr, "zmxx: unexpected argument %q\n", a)
 				return 1
 			}
-			branch = a
+			name = a
 		}
 	}
-	if branch == "" {
-		fmt.Fprintln(stderr, "zmxx remove: branch name required")
+	if name == "" {
+		fmt.Fprintln(stderr, "zmxx remove: session name required")
 		return 1
 	}
-	repo, err := requireRepo()
+	sessions, err := zmx.ZmxxSessions()
 	if err != nil {
 		fmt.Fprintf(stderr, "zmxx: %v\n", err)
 		return 1
 	}
-	worktreePath := workspace.BranchDir(repo.ID, branch)
-	sessionName := workspace.SessionName(repo.ID, branch)
-
-	registered := false
-	missing := false
-	worktrees, err := repo.ListWorktrees()
-	if err != nil {
-		fmt.Fprintf(stderr, "zmxx: %v\n", err)
-		return 1
-	}
-	for _, wt := range worktrees {
-		if gitx.SamePath(wt.Path, worktreePath) {
-			registered = true
-			if _, statErr := os.Stat(worktreePath); os.IsNotExist(statErr) {
-				// Registered in git but the directory is already gone.
-				missing = true
-			}
+	var target *zmx.Session
+	for i := range sessions {
+		if sessions[i].Name == name {
+			target = &sessions[i]
 			break
 		}
 	}
-	if !registered {
-		if _, statErr := os.Stat(worktreePath); statErr != nil {
-			fmt.Fprintf(stderr, "zmxx: no managed worktree for branch %q\n", branch)
-			return 1
-		}
-		fmt.Fprintf(stderr, "zmxx: path exists but is not a registered worktree: %s\n", worktreePath)
+	if target == nil {
+		fmt.Fprintf(stderr, "zmxx: no zmxx session %q (see `zmxx sessions`)\n", name)
 		return 1
+	}
+	worktreePath := target.Worktree
+	sessionName := target.Name
+	if worktreePath == "" {
+		fmt.Fprintf(stderr, "zmxx: session %q has no %s label; remove its worktree by hand\n", sessionName, workspace.LabelMarker+".worktree")
+		return 1
+	}
+	repo, err := removeRepo(worktreePath)
+	if err != nil {
+		fmt.Fprintf(stderr, "zmxx: %v\n", err)
+		return 1
+	}
+
+	missing := false
+	if _, statErr := os.Stat(worktreePath); os.IsNotExist(statErr) {
+		// Registered in git but the directory is already gone.
+		missing = true
 	}
 
 	if !missing && !force {
@@ -446,25 +389,4 @@ func cmdSwitch(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
-}
-
-func shortenHome(p string) string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return p
-	}
-	if p == home {
-		return "~"
-	}
-	if strings.HasPrefix(p, home+string(filepath.Separator)) {
-		return "~" + p[len(home):]
-	}
-	return p
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n-1] + "\u2026"
 }

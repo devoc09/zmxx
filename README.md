@@ -43,14 +43,14 @@ zmxx new feature/foo
 # Create a branch from a different starting point
 zmxx new feature/bar --base main
 
-# List managed workspaces for this repository
-zmxx list
+# List all zmxx sessions
+zmxx sessions
 
-# Kill the session and remove the worktree (keep the branch)
-zmxx remove feature/foo
+# Kill a session and remove its worktree (keep the branch)
+zmxx remove zmxx-0123456789ab-0123456789ab
 
 # Remove a workspace with work in progress (--force skips confirmation and discards uncommitted changes)
-zmxx remove feature/foo --force
+zmxx remove <session> --force
 ```
 
 ### Session lifetime
@@ -96,4 +96,4 @@ In the picker:
 - Do not use `ZMX_SESSION_PREFIX` for sessions managed by zmxx. zmxx clears the prefix for every zmx call.
 - `zmxx remove` kills the zmx session first. Removing the session you are currently attached to disconnects your terminal.
 - Sessions share a single namespace across repositories. The picker displays all zmxx sessions.
-- To run a command other than Neovim in a workspace, use `zmx attach <session-name> <command>` directly. Run `zmxx list` to find the session name.
+- To run a command other than Neovim in a workspace, use `zmx attach <session-name> <command>` directly. Run `zmxx sessions` to find the session name.
