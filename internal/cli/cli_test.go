@@ -37,7 +37,7 @@ func TestRemoveSessionRemovesWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MkdirTemp: %v", err)
 	}
-	t.Cleanup(func() { os.RemoveAll(zmxDir) })
+	t.Cleanup(func() { os.RemoveAll(zmxDir) }) //nolint:gosec,errcheck // best-effort cleanup
 	t.Setenv("ZMX_DIR", zmxDir)
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 

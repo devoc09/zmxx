@@ -89,7 +89,7 @@ func cmdNew(args []string, stdout, stderr io.Writer) int {
 				return 1
 			}
 			i++
-			base = args[i]
+			base = args[i] //nolint:gosec // G602: bounds checked above
 		case strings.HasPrefix(args[i], "--base="):
 			base = strings.TrimPrefix(args[i], "--base=")
 		case strings.HasPrefix(args[i], "-"):

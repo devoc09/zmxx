@@ -4,10 +4,14 @@ A file for [guiding coding agents](https://agents.md/).
 
 ## Commands
 
+- **Toolchain:** `mise install` (installs `go` and `golangci-lint` pinned in
+  `.mise.toml`; CI uses [mise-action](https://github.com/jdx/mise-action))
 - **Build (CLI):** `go build -o ~/.local/bin/zmxx ./cmd/zmxx`
 - **Test (Go):** `go test ./...`
 - **Test filter (Go):** `go test ./internal/<pkg> -run <test name>`
 - **Vet:** `go vet ./...`
+- **Lint:** `golangci-lint run` (config: `.golangci.yml`; includes `gofmt`
+  check — format with `go fmt ./...`)
 - **Test (picker):** `nvim --headless -u NONE -l tests/picker.lua`
   - Requires the `zmx` binary. Runs real zmx sessions in a private socket
     directory (`ZMX_DIR`), stubs fzf-lua, and drives the picker callbacks

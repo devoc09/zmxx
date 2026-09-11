@@ -1,0 +1,25 @@
+version: "2"
+linters:
+  enable:
+    - gosec
+    - misspell
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+  exclusions:
+    rules:
+      # test cleanup: nothing useful to do when RemoveAll fails
+      - path: _test\.go
+        linters:
+          - errcheck
+      # zmxx's job is exec'ing git/zmx with user-supplied args; there is no
+      # privilege boundary to protect. G301: worktree dirs use standard 0755.
+      - linters:
+          - gosec
+        text: "G204|G301"
+formatters:
+  enable:
+    - gofmt
