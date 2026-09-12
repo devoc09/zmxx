@@ -61,7 +61,7 @@ Usage:
                                      and open a persistent nvim session
   zmxx sessions [--json]             List all zmxx sessions
   zmxx remove <session> [--force]    Kill the session and remove its worktree
-  zmxx preview <session>             Print scrollback tail (picker preview)
+  zmxx preview <session>             Print ANSI-colored scrollback (picker preview)
   zmxx switch <session>              Switch the terminal to another session
 
 Options:

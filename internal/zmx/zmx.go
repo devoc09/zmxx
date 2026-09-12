@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/devoc09/zmxx/internal/workspace"
@@ -173,13 +174,26 @@ func Kill(name string) error {
 	return nil
 }
 
-// History returns the plain-text scrollback tail of a session.
+// vtNoise matches ANSI CSI sequences other than SGR (color) codes, which
+// zmx history --vt emits alongside the colors (cursor motion, mode resets).
+var vtNoise = regexp.MustCompile("\x1b\\[[0-9;:?<]*[^0-9;:?<m]")
+
+// cleanVT keeps SGR color sequences and drops other control sequences plus
+// carriage returns, which would garble pagers such as the fzf preview pane.
+func cleanVT(s string) string {
+	s = strings.ReplaceAll(s, "\r", "")
+	return vtNoise.ReplaceAllString(s, "")
+}
+
+// History returns the ANSI-colored scrollback tail of a session, rendered
+// through zmx's virtual terminal (--vt) — the same 256-color SGR stream
+// attached clients display.
 func History(name string, maxLines int) (string, error) {
-	out, errOut, err := run("", envPrefixCleared(), nil, "history", name)
+	out, errOut, err := run("", envPrefixCleared(), nil, "history", name, "--vt")
 	if err != nil {
 		return "", fmt.Errorf("zmx history: %s", strings.TrimSpace(string(errOut)))
 	}
-	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	lines := strings.Split(strings.TrimRight(cleanVT(string(out)), "\n"), "\n")
 	if len(lines) > maxLines {
 		lines = lines[len(lines)-maxLines:]
 	}
