@@ -10,7 +10,7 @@ with [zmx](https://zmx.sh).
 ## Requirements
 
 - Go 1.24 or later (for building)
-- [zmx](https://zmx.sh) 0.8.0 or later (required for labels and session switching)
+- [zmx](https://zmx.sh) 0.8.1 or later (required for labels, session switching, and `--vt` scrollback)
 - Neovim 0.10 or later (uses `vim.system`)
 - [fzf-lua](https://github.com/ibhagwan/fzf-lua) (picker UI)
 
@@ -76,7 +76,7 @@ In Neovim:
 In the picker:
 
 - Filter by repository name, branch, worktree path, or connection count. Session names are hidden.
-- Preview the selected session's scrollback with `zmx history`, using `follow` to keep the preview scrolled to the bottom.
+- Preview the selected session's scrollback with `zmxx preview`, which renders it through zmx's virtual terminal (`zmx history --vt`) so ANSI colors match the original terminal, using `follow` to keep the preview scrolled to the bottom.
 - Press `Enter` to switch the terminal's zmx client to the selected session. Neovim itself continues running in the original session.
 - When Neovim is running outside a zmx session, the picker opens a new terminal tab and attaches to the selected session. Detach with zmx's `Ctrl+\` to close the tab and return to the original Neovim instance.
 
