@@ -28,7 +28,7 @@ A file for [guiding coding agents](https://agents.md/).
   - `internal/workspace`: pure naming/metadata layer (paths, session names, labels)
   - `internal/zmx`: zmx CLI wrapper (`attach`, `list`, `set`, `kill`, `history`)
 - Neovim plugin: `plugin/zmxx.lua`, `lua/zmxx/init.lua`
-  - Talks to the CLI only via subprocesses: `zmxx sessions --json` to list,
+  - Talks to the CLI only via subprocesses: `zmxx ls --json` to list,
     `zmxx switch` to move, `zmxx preview` in the fzf preview
   - Picker UI requires fzf-lua
 
@@ -50,7 +50,7 @@ A file for [guiding coding agents](https://agents.md/).
   terminal's client instead of nesting.
 - **Sessions are shell-based**: the session command is
   `bash -c 'nvim .; exec "${SHELL:-/bin/sh}"'`. Exiting nvim must not end the
-  session; only `zmxx remove` kills it.
+  session; only `zmxx rm` kills it.
 - **`zmxx switch` never creates sessions**: it verifies existence first,
   opting out of zmx attach's upsert behavior.
 

@@ -65,7 +65,7 @@ func TestRemoveSessionRemovesWorktree(t *testing.T) {
 	// Remove by session name from the unrelated repository repoB.
 	t.Chdir(repoB)
 	var stdout, stderr bytes.Buffer
-	if code := Run([]string{"remove", sessionName, "--yes"}, &stdout, &stderr); code != 0 {
+	if code := Run([]string{"rm", sessionName, "-f"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("remove failed (stdout=%q stderr=%q)", stdout.String(), stderr.String())
 	}
 	if zmx.SessionExists(sessionName) {

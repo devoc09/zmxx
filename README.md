@@ -44,13 +44,13 @@ zmxx new feature/foo
 zmxx new feature/bar --base main
 
 # List all zmxx sessions
-zmxx sessions
+zmxx ls
 
 # Kill a session and remove its worktree (keep the branch)
-zmxx remove zmxx-0123456789ab-0123456789ab
+zmxx rm zmxx-0123456789ab-0123456789ab
 
-# Remove a workspace with work in progress (--force skips confirmation and discards uncommitted changes)
-zmxx remove <session> --force
+# Remove a workspace with work in progress (-f skips confirmation and discards uncommitted changes)
+zmxx rm <session> -f
 ```
 
 ### Session lifetime
@@ -62,7 +62,7 @@ A workspace's zmx session is **shell-based**. `zmxx new` launches `nvim .` insid
 nvim .
 ```
 
-You can return to this workspace at any time using `zmxx switch` from another terminal or using the picker. Only `zmxx remove` explicitly terminates the session.
+You can return to this workspace at any time using `zmxx switch` from another terminal or using the picker. Only `zmxx rm` explicitly terminates the session.
 
 ## Session picker
 
@@ -85,7 +85,7 @@ In the picker:
 - Worktrees are placed at deterministic paths under `$XDG_DATA_HOME/zmxx/worktrees/<repo-id>/<branch-slug>-<hash>`. If `XDG_DATA_HOME` is unset, the base directory defaults to `~/.local/share/zmxx`.
 - `<repo-id>` is the first 12 hexadecimal characters of the SHA-256 hash of the origin URL, or the Git common directory if no origin URL is available.
 - zmx sessions are named `zmxx-<repo-id>-<branch-hash>`, with 12 characters for each hash, to fit within Unix socket path length limits.
-- The session command is `bash -c 'nvim .; exec "${SHELL:-/bin/sh}"'`. After Neovim exits, the shell takes over, keeping the workspace alive until `zmxx remove`.
+- The session command is `bash -c 'nvim .; exec "${SHELL:-/bin/sh}"'`. After Neovim exits, the shell takes over, keeping the workspace alive until `zmxx rm`.
 - Sessions are tagged with `zmxx=1` / `zmxx.repo` / `zmxx.reponame` / `zmxx.branch` / `zmxx.worktree` labels (metadata values use base64url encoding). The picker uses these labels to discover all zmxx sessions.
 - Switching uses zmx's native Switch IPC: running `zmxx switch <name>` → `zmx attach <name>` from Neovim lets zmx use `ZMX_SESSION` to move **only the terminal's client** to the target session.
 - If `ZMX_SESSION` is unset, `zmxx switch <name>` runs in a Neovim terminal tab, connecting as a client with a PTY for interactive use.
@@ -94,6 +94,6 @@ In the picker:
 ## Limitations and notes
 
 - Do not use `ZMX_SESSION_PREFIX` for sessions managed by zmxx. zmxx clears the prefix for every zmx call.
-- `zmxx remove` kills the zmx session first. Removing the session you are currently attached to disconnects your terminal.
+- `zmxx rm` kills the zmx session first. Removing the session you are currently attached to disconnects your terminal.
 - Sessions share a single namespace across repositories. The picker displays all zmxx sessions.
-- To run a command other than Neovim in a workspace, use `zmx attach <session-name> <command>` directly. Run `zmxx sessions` to find the session name.
+- To run a command other than Neovim in a workspace, use `zmx attach <session-name> <command>` directly. Run `zmxx ls` to find the session name.
