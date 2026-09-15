@@ -13,9 +13,9 @@ local function notify(msg, level)
   end)
 end
 
----@return zmxx.Session[] decoded from `zmxx sessions --json`
+---@return zmxx.Session[] decoded from `zmxx ls --json`
 local function list_sessions()
-  local job = vim.system({ "zmxx", "sessions", "--json" }, { text = true })
+  local job = vim.system({ "zmxx", "ls", "--json" }, { text = true })
   local result = job:wait(10000)
   if result.code ~= 0 then
     notify((result.stderr or "failed to list sessions"):gsub("%s+$", ""), vim.log.levels.ERROR)
@@ -23,7 +23,7 @@ local function list_sessions()
   end
   local ok, data = pcall(vim.json.decode, result.stdout)
   if not ok or type(data) ~= "table" then
-    notify("failed to parse `zmxx sessions --json` output", vim.log.levels.ERROR)
+    notify("failed to parse `zmxx ls --json` output", vim.log.levels.ERROR)
     return {}
   end
   return data

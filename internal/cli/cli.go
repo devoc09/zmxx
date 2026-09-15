@@ -36,9 +36,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	case "new":
 		return cmdNew(args[1:], stdout, stderr)
-	case "remove":
+	case "rm":
 		return cmdRemove(args[1:], stdout, stderr)
-	case "sessions":
+	case "ls":
 		return cmdSessions(args[1:], stdout, stderr)
 	case "preview":
 		return cmdPreview(args[1:], stdout, stderr)
@@ -59,8 +59,8 @@ func printUsage(w io.Writer) {
 Usage:
   zmxx new <branch> [--base <ref>]   Create (or reuse) a worktree for a branch
                                      and open a persistent nvim session
-  zmxx sessions [--json]             List all zmxx sessions
-  zmxx remove <session> [--force]    Kill the session and remove its worktree
+  zmxx ls [--json]                   List all zmxx sessions
+  zmxx rm <session> [-f]             Kill the session and remove its worktree
   zmxx preview <session>             Print ANSI-colored scrollback (picker preview)
   zmxx switch <session>              Switch the terminal to another session
 
@@ -174,21 +174,18 @@ func removeRepo(worktreePath string) (*gitx.Repo, error) {
 			return repo, nil
 		}
 	}
-	return nil, fmt.Errorf("cannot resolve the repository of %s; run `zmxx remove` from inside it", worktreePath)
+	return nil, fmt.Errorf("cannot resolve the repository of %s; run `zmxx rm` from inside it", worktreePath)
 }
 
 func cmdRemove(args []string, stdout, stderr io.Writer) int {
 	name := ""
 	force := false
-	yes := false
 	for _, a := range args {
 		switch a {
-		case "--force":
+		case "--force", "-f":
 			force = true
-		case "--yes":
-			yes = true
 		case "-h", "--help":
-			fmt.Fprintln(stdout, "usage: zmxx remove <session> [--force] [--yes]")
+			fmt.Fprintln(stdout, "usage: zmxx rm <session> [-f]")
 			return 0
 		default:
 			if strings.HasPrefix(a, "-") {
@@ -203,7 +200,7 @@ func cmdRemove(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if name == "" {
-		fmt.Fprintln(stderr, "zmxx remove: session name required")
+		fmt.Fprintln(stderr, "zmxx rm: session name required")
 		return 1
 	}
 	sessions, err := zmx.ZmxxSessions()
@@ -219,7 +216,7 @@ func cmdRemove(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if target == nil {
-		fmt.Fprintf(stderr, "zmxx: no zmxx session %q (see `zmxx sessions`)\n", name)
+		fmt.Fprintf(stderr, "zmxx: no zmxx session %q (see `zmxx ls`)\n", name)
 		return 1
 	}
 	worktreePath := target.Worktree
@@ -247,12 +244,12 @@ func cmdRemove(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		if dirty {
-			fmt.Fprintf(stderr, "zmxx: worktree %s has uncommitted changes; use --force to remove anyway\n", worktreePath)
+			fmt.Fprintf(stderr, "zmxx: worktree %s has uncommitted changes; use -f to remove anyway\n", worktreePath)
 			return 1
 		}
 	}
 
-	if !yes && !force {
+	if !force {
 		fmt.Fprintf(stdout, "kill session %q and remove worktree %s? [y/N] ", sessionName, worktreePath)
 		reader := bufio.NewReader(os.Stdin)
 		answer, _ := reader.ReadString('\n')
@@ -305,7 +302,7 @@ func cmdSessions(args []string, stdout, stderr io.Writer) int {
 		case "--json":
 			asJSON = true
 		case "-h", "--help":
-			fmt.Fprintln(stdout, "usage: zmxx sessions [--json]")
+			fmt.Fprintln(stdout, "usage: zmxx ls [--json]")
 			return 0
 		default:
 			fmt.Fprintf(stderr, "zmxx: unknown flag %q\n", a)
