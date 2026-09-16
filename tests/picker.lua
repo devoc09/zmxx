@@ -41,6 +41,11 @@ local ok, err = xpcall(function()
     end,
   }
   local picker = require("zmxx")
+  -- A missing binary must notify, not raise (vim.system raises on ENOENT).
+  local real_path = vim.env.PATH
+  vim.env.PATH = ""
+  assert(pcall(function() picker.sessions() end), "sessions() raised with zmxx missing from PATH")
+  vim.env.PATH = real_path
   picker.sessions()
   assert(#entries == 2, "expected both test sessions in picker")
   local original_buf = vim.api.nvim_get_current_buf()
