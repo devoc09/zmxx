@@ -13,18 +13,24 @@ local function notify(msg, level)
   end)
 end
 
----@return zmxx.Session[] decoded from `zmxx ls --json`
+-- vim.system raises (ENOENT) instead of reporting an exit code when the
+-- binary is missing from PATH, so every spawn below must be guarded.
+---@return zmxx.Session[]|nil decoded from `zmxx ls --json`; nil when listing failed
 local function list_sessions()
-  local job = vim.system({ "zmxx", "ls", "--json" }, { text = true })
+  local ok, job = pcall(vim.system, { "zmxx", "ls", "--json" }, { text = true })
+  if not ok then
+    notify(tostring(job), vim.log.levels.ERROR)
+    return nil
+  end
   local result = job:wait(10000)
   if result.code ~= 0 then
     notify((result.stderr or "failed to list sessions"):gsub("%s+$", ""), vim.log.levels.ERROR)
-    return {}
+    return nil
   end
-  local ok, data = pcall(vim.json.decode, result.stdout)
-  if not ok or type(data) ~= "table" then
+  local decoded, data = pcall(vim.json.decode, result.stdout)
+  if not decoded or type(data) ~= "table" then
     notify("failed to parse `zmxx ls --json` output", vim.log.levels.ERROR)
-    return {}
+    return nil
   end
   return data
 end
@@ -46,7 +52,7 @@ function M.switch(name)
     vim.cmd("tabnew")
     local buf = vim.api.nvim_get_current_buf()
     vim.bo[buf].bufhidden = "wipe"
-    local job = vim.fn.termopen({ "zmxx", "switch", name }, {
+    local ok, job = pcall(vim.fn.termopen, { "zmxx", "switch", name }, {
       on_exit = function(_, code)
         vim.schedule(function()
           if code ~= 0 then
@@ -60,18 +66,21 @@ function M.switch(name)
         end)
       end,
     })
-    if job <= 0 then
+    if not ok or job <= 0 then
       notify("failed to start `zmxx switch`", vim.log.levels.ERROR)
       return
     end
     vim.cmd("startinsert")
     return
   end
-  vim.system({ "zmxx", "switch", name }, { text = true }, function(result)
+  local ok, job = pcall(vim.system, { "zmxx", "switch", name }, { text = true }, function(result)
     if result.code ~= 0 then
       notify((result.stderr or "failed to switch session"):gsub("%s+$", ""), vim.log.levels.ERROR)
     end
   end)
+  if not ok then
+    notify("failed to start `zmxx switch`", vim.log.levels.ERROR)
+  end
 end
 
 --- Open the fzf-lua picker over all zmxx sessions.
@@ -85,6 +94,9 @@ function M.sessions(opts)
   end
 
   local sessions = list_sessions()
+  if not sessions then
+    return -- the failure was already reported
+  end
   if #sessions == 0 then
     notify("no zmxx sessions running (start one with `zmxx new <branch>`)")
     return
